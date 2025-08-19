@@ -67,92 +67,30 @@ export default function RentalReceiptGenerator() {
       })
       return
     }
-
     setIsLoading(true)
     try {
-      const jsPDF = (await import("jspdf")).default
-
-      // Create PDF
-      const pdf = new jsPDF("p", "mm", "a4")
-      const pageWidth = 210 // A4 width in mm
-      const pageHeight = 297 // A4 height in mm
-      const margin = 10
-      const receiptWidth = (pageWidth - margin * 3) / 2 // Two columns with margins
-      const receiptHeight = 50
-      const receiptsPerRow = 2
-      const receiptsPerPage = 10 // 5 rows × 2 columns
-
-      let currentPage = 1
-      let currentRow = 0
-      let currentCol = 0
-
-      // Add Myanmar font support to jsPDF
-      pdf.setFont("NotoSansMyanmar-Regular")
-
-      rentalData.forEach((rental, index) => {
-        // Calculate position
-        const x = margin + currentCol * (receiptWidth + margin)
-        const y = margin + currentRow * (receiptHeight + margin)
-
-        // Check if we need a new page
-        if (y + receiptHeight > pageHeight - margin) {
-          pdf.addPage()
-          currentPage++
-          currentRow = 0
-          currentCol = 0
-        }
-
-        // Recalculate position for new page
-        const finalX = margin + currentCol * (receiptWidth + margin)
-        const finalY = margin + currentRow * (receiptHeight + margin)
-
-        // Draw receipt border
-        pdf.setDrawColor(0, 0, 0)
-        pdf.setLineWidth(0.5)
-        pdf.rect(finalX, finalY, receiptWidth, receiptHeight)
-
-        // Draw header
-        pdf.setFontSize(8)
-        pdf.text("0 လ၊ ၂၀၂၅", finalX + receiptWidth / 2, finalY + 8, { align: "center" })
-        pdf.setFontSize(10)
-        pdf.text("အခန်းခ လစဉ်ပြေစာ", finalX + receiptWidth / 2, finalY + 15, { align: "center" })
-
-        // Draw separator line
-        pdf.line(finalX + 5, finalY + 18, finalX + receiptWidth - 5, finalY + 18)
-
-        // Draw content
-        pdf.setFontSize(8)
-        const contentY = finalY + 25
-        const lineHeight = 5
-
-        // Tenant name
-        pdf.text("ငှားရမ်းသူ:", finalX + 5, contentY)
-        pdf.text(rental.name, finalX + 25, contentY)
-
-        // Room number
-        pdf.text("အခန်းနံပါတ်:", finalX + 5, contentY + lineHeight)
-        pdf.text(rental.roomNo, finalX + 25, contentY + lineHeight)
-
-        // Price
-        pdf.text("အခန်းခ:", finalX + 5, contentY + lineHeight * 2)
-        pdf.text(rental.price, finalX + 25, contentY + lineHeight * 2)
-
-        // Move to next position
-        currentCol++
-        if (currentCol >= receiptsPerRow) {
-          currentCol = 0
-          currentRow++
-        }
+      // Add month/year to each record as needed
+      const enrichedData = rentalData.map(r => ({ ...r, month: "ဇွန်", year: "၂၀၂၅" }))
+      const response = await fetch("/api/generate-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rentalData: enrichedData }),
       })
-
-      pdf.save("rental-receipts.pdf")
-
+      if (!response.ok) throw new Error("PDF generation failed")
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = "rental-receipts.pdf"
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
       toast({
         title: "PDF generated successfully",
         description: `Generated ${rentalData.length} receipts`,
       })
     } catch (error) {
-      console.error("PDF generation error:", error)
       toast({
         title: "Error generating PDF",
         description: "Please try again",
@@ -163,7 +101,47 @@ export default function RentalReceiptGenerator() {
     }
   }
 
+  // View PDF handler
+  const viewPDF = async () => {
+    if (rentalData.length === 0) {
+      toast({
+        title: "No data available",
+        description: "Please upload a file first",
+        variant: "destructive",
+      })
+      return
+    }
+    setIsLoading(true)
+    try {
+      const enrichedData = rentalData.map(r => ({ ...r, month: "ဇွန်", year: "၂၀၂၅" }))
+      const response = await fetch("/api/generate-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rentalData: enrichedData }),
+      })
+      if (!response.ok) throw new Error("PDF generation failed")
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      window.open(url, "_blank")
+      // Optionally revoke the object URL after some time
+      setTimeout(() => window.URL.revokeObjectURL(url), 10000)
+      toast({
+        title: "PDF preview opened",
+        description: `Previewed ${rentalData.length} receipts`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error viewing PDF",
+        description: "Please try again",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const addSampleData = () => {
+    console.log('addSampleData called');
     const sampleData: RentalData[] = [
       { roomNo: "A1", name: "မင်းခန့်", price: "50000" },
       { roomNo: "A2", name: "မင်းခန့် စုမ", price: "50000" },
@@ -175,6 +153,7 @@ export default function RentalReceiptGenerator() {
       { roomNo: "B3", name: "ဇင်လှင်း", price: "50000" },
     ]
     setRentalData(sampleData)
+    console.log('rentalData set:', sampleData)
     toast({
       title: "Sample data loaded",
       description: `Added ${sampleData.length} sample records`,
@@ -234,32 +213,90 @@ export default function RentalReceiptGenerator() {
                 <Download className="h-4 w-4 mr-2" />
                 {isLoading ? "Generating..." : "Generate PDF"}
               </Button>
+              <Button onClick={viewPDF} disabled={isLoading || rentalData.length === 0} className="w-full mt-2" variant="secondary">
+                View PDF
+              </Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* Data Preview */}
-        {rentalData.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Data Preview</CardTitle>
-              <CardDescription>Preview of loaded rental data</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-                {rentalData.slice(0, 12).map((rental, index) => (
-                  <div key={index} className="border rounded-lg p-3 bg-white">
-                    <div className="text-sm font-medium">Room: {rental.roomNo}</div>
-                    <div className="text-sm text-gray-600">Name: {rental.name}</div>
-                    <div className="text-sm text-gray-600">Price: {rental.price}</div>
+        {/* Data Preview or Empty State */}
+        {rentalData.length > 0 ? (
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle>Data Preview</CardTitle>
+                <CardDescription>Preview of loaded rental data</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+                  {rentalData.slice(0, 12).map((rental, index) => (
+                    <div key={index} className="border rounded-lg p-3 bg-white">
+                      <div className="text-sm font-medium">Room: {rental.roomNo}</div>
+                      <div className="text-sm text-gray-600">Name: {rental.name}</div>
+                      <div className="text-sm text-gray-600">Price: {rental.price}</div>
+                    </div>
+                  ))}
+                </div>
+                {rentalData.length > 12 && (
+                  <div className="text-sm text-gray-500 mt-2">And {rentalData.length - 12} more records...</div>
+                )}
+              </CardContent>
+            </Card>
+            {/* Receipt Browser Preview */}
+            <div className="mt-8">
+              <h2 className="text-xl font-bold text-center text-indigo-700 mb-4">Receipt Browser Preview</h2>
+              <div
+                className="container mx-auto bg-white rounded-2xl shadow-lg p-6"
+                style={{
+                  maxWidth: 2000,
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: 24,
+                  justifyContent: 'center',
+                }}
+              >
+                {rentalData.map((rental, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      border: '1px solid #d1d5db',
+                      padding: '24px 20px',
+                      width: '100%',
+                      marginBottom: 20,
+                      background: '#f9fafb',
+                      borderRadius: 12,
+                      boxShadow: '0 2px 8px #0001',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 12, color: '#3730a3' }}>
+                      <span>{'ဇွန် ၂၀၂၅'}</span>
+                    </div>
+                    <div style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 12, color: '#3730a3' }}>
+                      <span>အခန်းခ လစဉ်ပြေစာ</span>
+                    </div>
+                    <div style={{ margin: '6px 0', fontSize: 15, display: 'flex', alignItems: 'center' }}>
+                      <span style={{ display: 'inline-block', width: 110, color: '#4b5563', fontWeight: 500 }}>ငှားရမ်းသူ:</span>
+                      <span style={{ color: '#1e293b', fontWeight: 400 }}>{rental.name}</span>
+                    </div>
+                    <div style={{ margin: '6px 0', fontSize: 15, display: 'flex', alignItems: 'center' }}>
+                      <span style={{ display: 'inline-block', width: 110, color: '#4b5563', fontWeight: 500 }}>အခန်းနံပါတ်:</span>
+                      <span style={{ color: '#1e293b', fontWeight: 400 }}>{rental.roomNo}</span>
+                    </div>
+                    <div style={{ margin: '6px 0', fontSize: 15, display: 'flex', alignItems: 'center' }}>
+                      <span style={{ display: 'inline-block', width: 110, color: '#4b5563', fontWeight: 500 }}>အခန်းခ:</span>
+                      <span style={{ color: '#1e293b', fontWeight: 400 }}>{rental.price}</span>
+                    </div>
                   </div>
                 ))}
               </div>
-              {rentalData.length > 12 && (
-                <div className="text-sm text-gray-500 mt-2">And {rentalData.length - 12} more records...</div>
-              )}
-            </CardContent>
-          </Card>
+            </div>
+          </>
+        ) : (
+          <div className="text-center text-red-500 font-semibold mt-8">No rental data loaded. Please upload a CSV or load sample data.</div>
         )}
       </div>
     </div>
