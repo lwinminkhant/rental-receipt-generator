@@ -194,8 +194,13 @@ export async function POST(req: NextRequest) {
 
     const browser = await puppeteer.launch({
       headless: true,
-      executablePath: "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+      //executablePath: "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
       args: ["--no-sandbox", "--disable-dev-shm-usage"],
+      // Do not set executablePath for Vercel; use default Chromium
+      // If you want to support local dev with Brave, use:
+      // executablePath: process.env.NODE_ENV === 'development' ? "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" : undefined,
+      // Or, for maximum compatibility:
+      // executablePath: process.env.NODE_ENV === 'development' ? puppeteer.executablePath() : undefined,
     })
     const page = await browser.newPage()
     await page.setContent(html, { waitUntil: "networkidle0" })
