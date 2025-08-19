@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import puppeteer from "puppeteer"
+import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer-core';
 import fs from "fs/promises"
 import path from "path"
 
@@ -193,14 +194,9 @@ export async function POST(req: NextRequest) {
 </html>`
 
     const browser = await puppeteer.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
       headless: true,
-      //executablePath: "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
-      args: ["--no-sandbox", "--disable-dev-shm-usage"],
-      // Do not set executablePath for Vercel; use default Chromium
-      // If you want to support local dev with Brave, use:
-      // executablePath: process.env.NODE_ENV === 'development' ? "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" : undefined,
-      // Or, for maximum compatibility:
-      // executablePath: process.env.NODE_ENV === 'development' ? puppeteer.executablePath() : undefined,
     })
     const page = await browser.newPage()
     await page.setContent(html, { waitUntil: "networkidle0" })
