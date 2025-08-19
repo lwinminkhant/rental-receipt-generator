@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Upload, FileText, Download } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import dayjs from "dayjs"
+import * as XLSX from "xlsx";
 
 interface RentalData {
   roomNo: string
@@ -23,42 +24,60 @@ export default function RentalReceiptGenerator() {
   const { toast } = useToast()
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const text = await file.text()
-      const lines = text.split("\n").filter((line) => line.trim())
-      const data: RentalData[] = []
-
-      // Skip header row and parse CSV data
-      for (let i = 1; i < lines.length; i++) {
-        const columns = lines[i].split(",").map((col) => col.trim().replace(/"/g, ""))
-        if (columns.length >= 3) {
-          data.push({
-            roomNo: columns[0],
-            name: columns[1],
-            price: columns[2],
-          })
+      let data: RentalData[] = [];
+      if (file.name.endsWith(".xlsx")) {
+        // Parse Excel
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+        // Skip header row and parse
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (row && row.length >= 3) {
+            data.push({
+              roomNo: String(row[0] ?? ""),
+              name: String(row[1] ?? ""),
+              price: String(row[2] ?? ""),
+            });
+          }
+        }
+      } else {
+        // Fallback: CSV/TXT
+        const text = await file.text();
+        const lines = text.split("\n").filter((line) => line.trim());
+        for (let i = 1; i < lines.length; i++) {
+          const columns = lines[i].split(",").map((col) => col.trim().replace(/"/g, ""));
+          if (columns.length >= 3) {
+            data.push({
+              roomNo: columns[0],
+              name: columns[1],
+              price: columns[2],
+            });
+          }
         }
       }
-
-      setRentalData(data)
+      setRentalData(data);
       toast({
         title: "File uploaded successfully",
         description: `Loaded ${data.length} rental records`,
-      })
+      });
     } catch (error) {
       toast({
         title: "Error uploading file",
         description: "Please check your file format and try again",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // Helper to convert to Burmese numerals
   function toBurmeseNumber(str: string) {
@@ -208,7 +227,7 @@ export default function RentalReceiptGenerator() {
                 <Input
                   id="file-upload"
                   type="file"
-                  accept=".csv,.txt"
+                  accept=".csv,.txt,.xlsx"
                   onChange={handleFileUpload}
                   disabled={isLoading}
                 />
@@ -225,9 +244,9 @@ export default function RentalReceiptGenerator() {
                 />
               </div>
               <div className="text-sm text-gray-500">Expected format: Room No., Name, Price</div>
-              <Button variant="outline" onClick={addSampleData} className="w-full bg-transparent">
+              {/* <Button variant="outline" onClick={addSampleData} className="w-full bg-transparent">
                 Load Sample Data
-              </Button>
+              </Button> */}
             </CardContent>
           </Card>
 
@@ -258,6 +277,8 @@ export default function RentalReceiptGenerator() {
         {/* Data Preview or Empty State */}
         {rentalData.length > 0 ? (
           <>
+            {/* Data Preview */}
+            {/*
             <Card>
               <CardHeader>
                 <CardTitle>Data Preview</CardTitle>
@@ -278,7 +299,9 @@ export default function RentalReceiptGenerator() {
                 )}
               </CardContent>
             </Card>
+            */}
             {/* Receipt Browser Preview */}
+            {/*
             <div className="mt-8">
               <h2 className="text-xl font-bold text-center text-indigo-700 mb-4">Receipt Browser Preview</h2>
               <div
@@ -329,6 +352,7 @@ export default function RentalReceiptGenerator() {
                 ))}
               </div>
             </div>
+            */}
           </>
         ) : (
           <div className="text-center text-red-500 font-semibold mt-8">No rental data loaded. Please upload a CSV or load sample data.</div>
