@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Upload, FileText, Download } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import dayjs from "dayjs"
 
 interface RentalData {
   roomNo: string
@@ -18,6 +19,7 @@ interface RentalData {
 export default function RentalReceiptGenerator() {
   const [rentalData, setRentalData] = useState<RentalData[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [selectedMonth, setSelectedMonth] = useState(dayjs().format("YYYY-MM"))
   const { toast } = useToast()
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,6 +60,25 @@ export default function RentalReceiptGenerator() {
     }
   }
 
+  // Helper to convert to Burmese numerals
+  function toBurmeseNumber(str: string) {
+    const burmeseDigits = ['၀','၁','၂','၃','၄','၅','၆','၇','၈','၉']
+    return str.replace(/\d/g, d => burmeseDigits[parseInt(d, 10)])
+  }
+
+  // Helper to get Myanmar month/year
+  function getMyanmarMonthYear(ym: string) {
+    const [year, month] = ym.split("-")
+    const myanmarMonths = [
+      "ဇန်နဝါရီ", "ဖေဖော်ဝါရီ", "မတ်", "ဧပြီ", "မေ", "ဇွန်", "ဇူလိုင်", "ဩဂုတ်", "စက်တင်ဘာ", "အောက်တိုဘာ", "နိုဝင်ဘာ", "ဒီဇင်ဘာ"
+    ]
+    return {
+      month: myanmarMonths[parseInt(month, 10) - 1] || month,
+      year: (parseInt(year, 10) + 0).toString(),
+      monthNumber: month
+    }
+  }
+
   const generatePDF = async () => {
     if (rentalData.length === 0) {
       toast({
@@ -69,8 +90,10 @@ export default function RentalReceiptGenerator() {
     }
     setIsLoading(true)
     try {
-      // Add month/year to each record as needed
-      const enrichedData = rentalData.map(r => ({ ...r, month: "ဇွန်", year: "၂၀၂၅" }))
+      const { month, year, monthNumber } = getMyanmarMonthYear(selectedMonth)
+      const burmeseYear = toBurmeseNumber(year)
+      const burmeseMonthNumber = toBurmeseNumber(String(parseInt(monthNumber, 10)))
+      const enrichedData = rentalData.map(r => ({ ...r, month, year, monthNumber, burmeseYear, burmeseMonthNumber }))
       const response = await fetch("/api/generate-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -101,7 +124,6 @@ export default function RentalReceiptGenerator() {
     }
   }
 
-  // View PDF handler
   const viewPDF = async () => {
     if (rentalData.length === 0) {
       toast({
@@ -113,7 +135,10 @@ export default function RentalReceiptGenerator() {
     }
     setIsLoading(true)
     try {
-      const enrichedData = rentalData.map(r => ({ ...r, month: "ဇွန်", year: "၂၀၂၅" }))
+      const { month, year, monthNumber } = getMyanmarMonthYear(selectedMonth)
+      const burmeseYear = toBurmeseNumber(year)
+      const burmeseMonthNumber = toBurmeseNumber(String(parseInt(monthNumber, 10)))
+      const enrichedData = rentalData.map(r => ({ ...r, month, year, monthNumber, burmeseYear, burmeseMonthNumber }))
       const response = await fetch("/api/generate-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -123,7 +148,6 @@ export default function RentalReceiptGenerator() {
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       window.open(url, "_blank")
-      // Optionally revoke the object URL after some time
       setTimeout(() => window.URL.revokeObjectURL(url), 10000)
       toast({
         title: "PDF preview opened",
@@ -186,6 +210,17 @@ export default function RentalReceiptGenerator() {
                   type="file"
                   accept=".csv,.txt"
                   onChange={handleFileUpload}
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="month-picker">Month</Label>
+                <input
+                  id="month-picker"
+                  type="month"
+                  className="border rounded px-2 py-1"
+                  value={selectedMonth}
+                  onChange={e => setSelectedMonth(e.target.value)}
                   disabled={isLoading}
                 />
               </div>
@@ -273,7 +308,7 @@ export default function RentalReceiptGenerator() {
                     }}
                   >
                     <div style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 12, color: '#3730a3' }}>
-                      <span>{'ဇွန် ၂၀၂၅'}</span>
+                      <span></span>
                     </div>
                     <div style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 12, color: '#3730a3' }}>
                       <span>အခန်းခ လစဉ်ပြေစာ</span>
